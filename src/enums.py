@@ -118,6 +118,7 @@ class LangChainAgent(Enum):
     PANDAS = "Pandas"
     JSON = 'JSON'
     SMART = 'SMART'
+    AUTOGPT = 'AUTOGPT'
 
 
 no_server_str = no_lora_str = no_model_str = '[None/Remove]'
@@ -131,6 +132,7 @@ model_token_mapping = {
     "gpt-4-32k": 32768,
     "gpt-4-32k-0314": 32768,
     "gpt-4-32k-0613": 32768,  # supports function tools
+    "gpt-4-1106-preview": 128000,
     "gpt-3.5-turbo": 4096,
     "gpt-3.5-turbo-0301": 4096,
     "gpt-3.5-turbo-0613": 4096,  # supports function tools
@@ -152,7 +154,7 @@ model_token_mapping = {
     "code-cushman-001": 2048,
 }
 
-openai_supports_functiontools = ["gpt-4-0613", "gpt-4-32k-0613", "gpt-3.5-turbo-0613", "gpt-3.5-turbo-16k-0613"]
+openai_supports_functiontools = ["gpt-4-1106-preview", "gpt-4-0613", "gpt-4-32k-0613", "gpt-3.5-turbo-0613", "gpt-3.5-turbo-16k-0613"]
 
 
 def does_support_functiontools(inference_server, model_name):
