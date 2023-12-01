@@ -5041,6 +5041,38 @@ def get_chain(query=None,
 
         tools = load_tools(["ddg-search"], llm=llm)
 
+        from src.serpapigooglemaps import SerpAPIGoogleMapsWrapper, SerpAPIGoogleMapsInput
+        from src.serpapigoogleevents import SerpAPIGoogleEventsWrapper, SerpAPIGoogleEventsInput
+        from langchain.tools import StructuredTool
+
+        mapsearch = SerpAPIGoogleMapsWrapper()
+        mapsearchTool = StructuredTool.from_function(
+            name="Map Search",
+            description="A wrapper around SERPAPI GoogleMaps Directions API. "
+                        "Useful for calculating the route between two locations. "
+                        "Input should be a location string for both start_addr and end_addr (e.g. London,GB).",
+            func=mapsearch.run,
+            coroutine=mapsearch.arun,
+            args_schema=SerpAPIGoogleMapsInput,
+            handle_tool_error=True,
+        )
+
+        tools.append(mapsearchTool)
+
+        searchEvents = SerpAPIGoogleEventsWrapper()
+        searchEventsTool = StructuredTool.from_function(
+            name="Google Search Events",
+            description="A wrapper around SERPAPI Google Events API. "
+                        "Useful for checking special Events in a location. "
+                        "Input should be a string for query (e.g. Events in Paris,FR).",
+            func=searchEvents.run,
+            coroutine=searchEvents.arun,
+            args_schema=SerpAPIGoogleEventsInput,
+            handle_tool_error=True,
+        )
+
+        tools.append(searchEventsTool)
+
         from langchain.docstore import InMemoryDocstore
         from langchain.embeddings import OpenAIEmbeddings
         from langchain.vectorstores import FAISS
@@ -5054,12 +5086,22 @@ def get_chain(query=None,
         index = faiss.IndexFlatL2(embedding_size)
         vectorstore = FAISS(embeddings_model.embed_query, index, InMemoryDocstore({}), {})
 
+        from langchain.memory.chat_message_histories import FileChatMessageHistory
+        from langchain.schema.messages import HumanMessage, AIMessage
+
+        messages_history = FileChatMessageHistory("/tmp/chat_history.txt")
+        messages_history.clear()
+        for messages in chat_conversation:
+            messages_history.add_message(HumanMessage(content=messages[0]))
+            messages_history.add_message(AIMessage(content=messages[1]))
+
         agent = AutoGPT.from_llm_and_tools(
-            ai_name="Anthox",
-            ai_role="Cooking Assistant",
+            ai_name="Sherlock",
+            ai_role="Customer Success Manager",
             tools=tools,
             llm=llm,
             memory=vectorstore.as_retriever(),
+            chat_history_memory=messages_history
         )
         # Set verbose to be true
         agent.chain.verbose = True

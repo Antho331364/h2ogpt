@@ -22,6 +22,7 @@ from langchain.callbacks.base import BaseCallbackHandler, Callbacks
 from langchain.schema import LLMResult
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document
+from langchain.memory.chat_message_histories import FileChatMessageHistory
 
 
 class StreamingGradioCallbackHandler(BaseCallbackHandler):
@@ -69,6 +70,8 @@ class StreamingGradioCallbackHandler(BaseCallbackHandler):
     ) -> None:
         """Run when LLM errors."""
         self.text_queue.put(self.stop_signal)
+        memory = FileChatMessageHistory("/tmp/chat_history.txt")
+        memory.clear()
 
     def __iter__(self):
         return self
