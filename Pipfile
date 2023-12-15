@@ -1,0 +1,11 @@
+[[source]]
+url = "https://${CI-DEPLOY-USER}:${CI_DEPLOY_PASSWORD}@gitlab.com/api/v4/projects/52750088/packages/pypi/simple"
+verify_ssl = true
+name = "gitlab"
+
+[packages]
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"

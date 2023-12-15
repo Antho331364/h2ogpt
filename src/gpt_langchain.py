@@ -45,6 +45,7 @@ from langchain.tools import PythonREPLTool
 from langchain.tools.json.tool import JsonSpec
 from tqdm import tqdm
 
+from src.GoLoader import GoLoader
 from src.db_utils import length_db1, set_dbid, set_userid, get_dbid, get_userid_direct, get_username_direct, \
     set_userid_direct
 from src.output_parser import H2OPythonMRKLOutputParser
@@ -1330,7 +1331,7 @@ def get_llm(use_openai_model=False,
             max_new_tokens0=512,
             min_new_tokens=1,
             early_stopping=False,
-            max_time=180,
+            max_time=3600,
             repetition_penalty=1.0,
             num_return_sequences=1,
             prompt_type=None,
@@ -1925,6 +1926,7 @@ def get_supported_types():
                         "gz",
                         "gzip",
                         "urls",
+                        "go",
                         ]
     # "msg",  GPL3
 
@@ -2700,6 +2702,10 @@ def file_to_doc(file,
         doc1 = PythonLoader(file).load()
         add_meta(doc1, file, parser='PythonLoader')
         doc1 = chunk_sources(doc1, language=Language.PYTHON)
+    elif file.lower().endswith('.go'):
+        doc1 = GoLoader(file).load()
+        add_meta(doc1, file, parser='GoLoader')
+        doc1 = chunk_sources(doc1, language=Language.GO)
     elif file.lower().endswith('.toml'):
         doc1 = TomlLoader(file).load()
         add_meta(doc1, file, parser='TomlLoader')
@@ -3117,6 +3123,7 @@ def path_to_docs(path_or_paths, verbose=False, fail_any_exception=False, n_jobs=
 
     def no_tqdm(x):
         return x
+
     my_tqdm = no_tqdm if not verbose else tqdm
 
     if n_jobs != 1 and len(globs_non_image_types) > 1:
@@ -5038,12 +5045,112 @@ def get_chain(query=None,
     if LangChainAgent.AUTOGPT.value in langchain_agents:
         from langchain_experimental.autonomous_agents.autogpt.agent import AutoGPT
         from langchain.agents import load_tools
-
+        from langchain.tools import StructuredTool
         tools = load_tools(["ddg-search"], llm=llm)
+
+        from src.autogpt_doc_tool import SearchInDocumentsWrapper
+
+        docsearch = SearchInDocumentsWrapper(query_embedding=query_embedding,
+                                             iinput=iinput,
+                                             context=context,
+                                             use_openai_model=use_openai_model,
+                                             use_openai_embedding=use_openai_embedding,
+                                             first_para=first_para,
+                                             text_limit=text_limit,
+                                             top_k_docs=top_k_docs,
+                                             chunk=chunk,
+                                             chunk_size=chunk_size,
+                                             use_unstructured=use_unstructured,
+                                             use_playwright=use_playwright,
+                                             use_selenium=use_selenium,
+                                             use_pymupdf=use_pymupdf,
+                                             use_unstructured_pdf=use_unstructured_pdf,
+                                             use_pypdf=use_pypdf,
+                                             enable_pdf_ocr=enable_pdf_ocr,
+                                             enable_pdf_doctr=enable_pdf_doctr,
+                                             try_pdf_as_html=try_pdf_as_html,
+                                             enable_ocr=enable_ocr,
+                                             enable_doctr=enable_doctr,
+                                             enable_pix2struct=enable_pix2struct,
+                                             enable_captions=enable_captions,
+                                             enable_transcriptions=enable_transcriptions,
+                                             captions_model=captions_model,
+                                             caption_loader=caption_loader,
+                                             doctr_loader=doctr_loader,
+                                             pix2struct_loader=pix2struct_loader,
+                                             asr_model=asr_model,
+                                             asr_loader=asr_loader,
+                                             jq_schema=jq_schema,
+                                             langchain_mode_paths=langchain_mode_paths,
+                                             langchain_mode_types=langchain_mode_types,
+                                             detect_user_path_changes_every_query=detect_user_path_changes_every_query,
+                                             db_type=db_type,
+                                             model_name=model_name,
+                                             inference_server=inference_server,
+                                             max_new_tokens=max_new_tokens,
+                                             langchain_only_model=langchain_only_model,
+                                             hf_embedding_model=hf_embedding_model,
+                                             migrate_embedding_model=migrate_embedding_model,
+                                             auto_migrate_db=auto_migrate_db,
+                                             prompter=prompter,
+                                             prompt_type=prompt_type,
+                                             prompt_dict=prompt_dict,
+                                             system_prompt=system_prompt,
+                                             cut_distance=cut_distance,
+                                             add_chat_history_to_context=add_chat_history_to_context,
+                                             add_search_to_context=add_search_to_context,
+                                             keep_sources_in_context=keep_sources_in_context,
+                                             memory_restriction_level=memory_restriction_level,
+                                             top_k_docs_max_show=top_k_docs_max_show,
+                                             load_db_if_exists=load_db_if_exists,
+                                             db=db,
+                                             langchain_mode=langchain_mode,
+                                             langchain_action=langchain_action,
+                                             document_subset=document_subset,
+                                             document_choice=document_choice,
+                                             pre_prompt_query=pre_prompt_query,
+                                             prompt_query=prompt_query,
+                                             pre_prompt_summary=pre_prompt_summary,
+                                             prompt_summary=prompt_summary,
+                                             text_context_list=text_context_list,
+                                             chat_conversation=chat_conversation,
+                                             n_jobs=n_jobs,
+                                             llm=llm,
+                                             llm_kwargs=llm_kwargs,
+                                             streamer=streamer,
+                                             prompt_type_out=prompt_type_out,
+                                             only_new_text=only_new_text,
+                                             tokenizer=tokenizer,
+                                             verbose=verbose,
+                                             docs_ordering_type=docs_ordering_type,
+                                             min_max_new_tokens=min_max_new_tokens,
+                                             max_input_tokens=max_input_tokens,
+                                             max_total_input_tokens=max_total_input_tokens,
+                                             truncation_generation=truncation_generation,
+                                             docs_token_handling=docs_token_handling,
+                                             docs_joiner=docs_joiner,
+                                             doc_json_mode=doc_json_mode,
+                                             async_output=async_output,
+                                             gradio_server=gradio_server,
+                                             auto_reduce_chunks=auto_reduce_chunks,
+                                             max_chunks=max_chunks,
+                                             use_llm_if_no_docs=use_llm_if_no_docs,
+                                             query_action=query_action,
+                                             summarize_action=summarize_action)
+
+        docsearchTool = StructuredTool.from_function(
+            name="Documents Search",
+            description="A wrapper around SearchInDocuments. "
+                        "Useful for checking information about accommodation, equipments. "
+                        "Input should be a string for query.",
+            func=docsearch.get_search_documents,
+            handle_tool_error=True,
+        )
+
+        tools.append(docsearchTool)
 
         from src.serpapigooglemaps import SerpAPIGoogleMapsWrapper, SerpAPIGoogleMapsInput
         from src.serpapigoogleevents import SerpAPIGoogleEventsWrapper, SerpAPIGoogleEventsInput
-        from langchain.tools import StructuredTool
 
         mapsearch = SerpAPIGoogleMapsWrapper()
         mapsearchTool = StructuredTool.from_function(
@@ -5072,6 +5179,227 @@ def get_chain(query=None,
         )
 
         tools.append(searchEventsTool)
+
+        from beds_24_api_v2_client import AuthenticatedClient
+
+        client = AuthenticatedClient(base_url="https://beds24.com/api/v2/", token="SuperSecretToken")
+
+        import smoobuwrapper
+
+        smoobuClient = smoobuwrapper.SmoobuAPIWrapper()
+        smoobuAvailabilityTool = StructuredTool.from_function(
+            name="Smoobu Apartment Availability",
+            description="A wrapper around Smoobu API. "
+                        "Useful for checking availabilities of properties and dates. For that you send a request with "
+                        "arrival and departure date and the property ID.",
+            func=smoobuClient.run_get_smoobu_availability,
+            args_schema=smoobuwrapper.SmoobuAvailabityBodyInput,
+            handle_tool_error=True,
+        )
+
+        tools.append(smoobuAvailabilityTool)
+
+        getUserTool = StructuredTool.from_function(
+            name="Smoobu Get User",
+            description="Useful when you need to Retrieve user information from Smoobu.",
+            func=smoobuClient.run_get_user,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getUserTool)
+
+        createBookingTool = StructuredTool.from_function(
+            name="Smoobu Create Booking",
+            description="Useful when you need to Create a new booking in Smoobu.",
+            func=smoobuClient.run_create_booking,
+            args_schema=smoobuwrapper.CreateBookingBodyInput,
+            handle_tool_error=True,
+        )
+        tools.append(createBookingTool)
+
+        updateBookingTool = StructuredTool.from_function(
+            name="Smoobu Update Booking",
+            description="Useful when you need to Update an existing booking in Smoobu.",
+            func=smoobuClient.run_update_booking,
+            args_schema=smoobuwrapper.UpdateBookingBodyInput,
+            handle_tool_error=True,
+        )
+        tools.append(updateBookingTool)
+
+        getBookingsTool = StructuredTool.from_function(
+            name="Smoobu Get Bookings",
+            description="Useful when you need to Retrieve a list of bookings from Smoobu.",
+            func=smoobuClient.run_get_bookings,
+            args_schema=smoobuwrapper.GetBookingsQueryParams,
+            handle_tool_error=True,
+        )
+        tools.append(getBookingsTool)
+
+
+        cancelReservationTool = StructuredTool.from_function(
+            name="Smoobu Cancel Reservation",
+            description="Useful when you need to Cancel a reservation in Smoobu.",
+            func=smoobuClient.run_cancel_reservation,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(cancelReservationTool)
+
+        getBookingTool = StructuredTool.from_function(
+            name="Smoobu Get Booking",
+            description="Useful when you need to Retrieve details of a specific booking from Smoobu.",
+            func=smoobuClient.run_get_booking,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getBookingTool)
+
+        getPriceElementsTool = StructuredTool.from_function(
+            name="Smoobu Get Price Elements",
+            description="Useful when you need to Retrieve price elements from Smoobu.",
+            func=smoobuClient.run_get_price_elements,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getPriceElementsTool)
+
+        getPriceElementTool = StructuredTool.from_function(
+            name="Smoobu Get Price Element",
+            description="Useful when you need to Retrieve a single price element from Smoobu.",
+            func=smoobuClient.run_get_price_element,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getPriceElementTool)
+
+        getPlaceholdersTool = StructuredTool.from_function(
+            name="Smoobu Get Placeholders",
+            description="Useful when you need to Retrieve placeholders from Smoobu. Placeholders allow to retrieve additional informations on a specific booking",
+            func=smoobuClient.run_get_placeholders,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getPlaceholdersTool)
+
+        getRatesTool = StructuredTool.from_function(
+            name="Smoobu Get Rates",
+            description="Useful when you need to Retrieve rates for apartments within a specified date range.",
+            func=smoobuClient.run_get_rates,
+            args_schema=smoobuwrapper.GetRatesQueryParams,
+            handle_tool_error=True,
+        )
+        tools.append(getRatesTool)
+
+        getApartmentIdsTool = StructuredTool.from_function(
+            name="Smoobu Get Apartment IDs",
+            description="Useful when you need to Retrieve a list of apartment IDs.",
+            func=smoobuClient.run_get_apartment_ids,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getApartmentIdsTool)
+
+        getApartmentTool = StructuredTool.from_function(
+            name="Smoobu Get Apartment",
+            description="Useful when you need to Retrieve details for a specific apartment.",
+            func=smoobuClient.run_get_apartment,
+            args_schema=None,  # Replace with the correct schema if needed
+            handle_tool_error=True,
+        )
+        tools.append(getApartmentTool)
+
+        getMessageTool = StructuredTool.from_function(
+            name="Smoobu Get Message",
+            description="Useful when you need to Retrieve messages from the messaging system.",
+            func=smoobuClient.run_get_message,
+            args_schema=smoobuwrapper.GetMessageQueryParams,
+            handle_tool_error=True,
+        )
+        tools.append(getMessageTool)
+
+        getAddonsTool = StructuredTool.from_function(
+            name="Smoobu Get Addons",
+            description="Useful when you need to Retrieve available addons. Addons are additional services offered by the concierge or host",
+            func=smoobuClient.run_get_addons,
+            args_schema=None,  # Replace with the correct schema if needed
+            handle_tool_error=True,
+        )
+        tools.append(getAddonsTool)
+
+        sendMessageToGuestTool = StructuredTool.from_function(
+            name="Smoobu Send Message to Guest",
+            description="Useful when you need to Send a message to a guest.",
+            func=smoobuClient.run_send_message_to_guest,
+            args_schema=smoobuwrapper.SendMessageToGuestBodyInput,
+            handle_tool_error=True,
+        )
+        tools.append(sendMessageToGuestTool)
+
+        sendMessageToHostTool = StructuredTool.from_function(
+            name="Smoobu Send Message to Host",
+            description="Useful when you need to Send a message to the host.",
+            func=smoobuClient.run_send_message_to_host,
+            args_schema=smoobuwrapper.SendMessageToHostBodyInput,
+            handle_tool_error=True,
+        )
+        tools.append(sendMessageToHostTool)
+
+        getCustomPlaceholdersTool = StructuredTool.from_function(
+            name="Smoobu Get Custom Placeholders",
+            description="Useful when you need to Retrieve custom placeholders from Smoobu. Custom Placeholders allow to retrieve additional informations on a specific booking or apartment.",
+            func=smoobuClient.run_get_custom_placeholders,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getCustomPlaceholdersTool)
+
+        getCustomPlaceholderTool = StructuredTool.from_function(
+            name="Smoobu Get Custom Placeholder",
+            description="Useful when you need to Retrieve a specific custom placeholder from Smoobu. Custom Placeholder allow to retrieve additional informations on a specific booking or apartment.",
+            func=smoobuClient.run_get_custom_placeholder,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getCustomPlaceholderTool)
+
+        getCustomPlaceholderTranslationsTool = StructuredTool.from_function(
+            name="Smoobu Get Custom Placeholder Translations",
+            description="Useful when you need to Retrieve translations for a custom placeholder from Smoobu.",
+            func=smoobuClient.run_get_custom_placeholder_translations,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getCustomPlaceholderTranslationsTool)
+
+        getCustomPlaceholderTranslationTool = StructuredTool.from_function(
+            name="Smoobu Get Custom Placeholder Translation",
+            description="Useful when you need to Retrieve a specific translation for a custom placeholder from Smoobu.",
+            func=smoobuClient.run_get_custom_placeholder_translation,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getCustomPlaceholderTranslationTool)
+
+        getGuestsTool = StructuredTool.from_function(
+            name="Smoobu Get Guests",
+            description="Useful when you need to Retrieve a list of guests from Smoobu.",
+            func=smoobuClient.run_get_guests,
+            args_schema=smoobuwrapper.GetGuestsQueryParams,
+            handle_tool_error=True,
+        )
+        tools.append(getGuestsTool)
+
+        getGuestTool = StructuredTool.from_function(
+            name="Smoobu Get Guest",
+            description="Useful when you need to Retrieve information for a specific guest from Smoobu.",
+            func=smoobuClient.run_get_guest,
+            args_schema=None,
+            handle_tool_error=True,
+        )
+        tools.append(getGuestTool)
+
+
+
 
         from langchain.docstore import InMemoryDocstore
         from langchain.embeddings import OpenAIEmbeddings

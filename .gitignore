@@ -40,5 +40,12 @@ Dockerfile_deps
 venv
 
 # Mac one click installer
+urls_downloaded
 Tesseract-OCR/
 poppler/
+
+auth.json*
+chats
+users
+locks
+sources_dir
