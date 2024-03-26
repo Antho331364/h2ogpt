@@ -2,7 +2,9 @@ import sys
 
 import pytest
 
-from src.utils import get_list_or_str, read_popen_pipes, get_token_count, reverse_ucurve_list, undo_reverse_ucurve_list
+from src.gen import apply_chat_template
+from src.utils import get_list_or_str, read_popen_pipes, get_token_count, reverse_ucurve_list, undo_reverse_ucurve_list, \
+    is_uuid4
 from tests.utils import wrap_test_forked
 import subprocess as sp
 
@@ -108,11 +110,11 @@ def test_limited_prompt(instruction, chat_conversation, iinput, context, system_
     chat = True
     stream_output = True
     from src.prompter import Prompter
-    prompter = Prompter(prompt_type, prompt_dict, debug=debug, chat=chat,
+    prompter = Prompter(prompt_type, prompt_dict, debug=debug,
                         stream_output=stream_output,
                         system_prompt=system_prompt)
 
-    min_max_new_tokens = 256  # like in get_limited_prompt()
+    min_max_new_tokens = 512  # like in get_limited_prompt()
     max_input_tokens = -1
     max_new_tokens = 1024
     model_max_length = 4096
@@ -122,8 +124,8 @@ def test_limited_prompt(instruction, chat_conversation, iinput, context, system_
         instruction, iinput, context, \
         num_prompt_tokens, max_new_tokens, \
         num_prompt_tokens0, num_prompt_tokens_actual, \
-        chat_index, external_handle_chat_conversation, \
-        top_k_docs_trial, one_doc_size, truncation_generation = \
+        history_to_use_final, external_handle_chat_conversation, \
+        top_k_docs_trial, one_doc_size, truncation_generation, system_prompt = \
         get_limited_prompt(instruction, iinput, tokenizer,
                            prompter=prompter,
                            max_new_tokens=max_new_tokens,
@@ -134,10 +136,10 @@ def test_limited_prompt(instruction, chat_conversation, iinput, context, system_
                            min_max_new_tokens=min_max_new_tokens,
                            max_input_tokens=max_input_tokens,
                            verbose=True)
-    print('%s -> %s or %s: chat_index: %s top_k_docs_trial=%s one_doc_size: %s' % (num_prompt_tokens0,
+    print('%s -> %s or %s: len(history_to_use_final): %s top_k_docs_trial=%s one_doc_size: %s' % (num_prompt_tokens0,
                                                                                    num_prompt_tokens,
                                                                                    num_prompt_tokens_actual,
-                                                                                   chat_index,
+                                                                                   len(history_to_use_final),
                                                                                    top_k_docs_trial,
                                                                                    one_doc_size),
           flush=True, file=sys.stderr)
@@ -177,3 +179,50 @@ def test_reverse_ucurve():
     for a, b in ab:
         assert reverse_ucurve_list(a) == b
         assert undo_reverse_ucurve_list(b) == a
+
+
+@wrap_test_forked
+def check_gradio():
+    import gradio as gr
+    assert gr.__h2oai__
+
+
+def test_is_uuid4():
+    # Example usage:
+    test_strings = [
+        "f47ac10b-58cc-4372-a567-0e02b2c3d479", # Valid UUID v4
+        "not-a-uuid",                            # Invalid
+        "12345678-1234-1234-1234-123456789abc",  # Valid UUID v4
+        "xyz"                                    # Invalid
+    ]
+    # "f47ac10b-58cc-4372-a567-0e02b2c3d479": True (Valid UUID v4)
+    # "not-a-uuid": False (Invalid)
+    # "12345678-1234-1234-1234-123456789abc": False (Invalid, even though it resembles a UUID, it doesn't follow the version 4 UUID pattern)
+    # "xyz": False (Invalid)
+
+    # Check each string and print whether it's a valid UUID v4
+    assert [is_uuid4(s) for s in test_strings] == [True, False, False, False]
+
+
+def test_chat_template():
+    instruction = "Who are you?"
+    system_prompt = "Be kind"
+    history_to_use = [('Are you awesome?', "Yes I'm awesome.")]
+    other_base_models = ['h2oai/mixtral-gm-rag-experimental-v2']
+    supports_system_prompt = ['meta-llama/Llama-2-7b-chat-hf', 'openchat/openchat-3.5-1210', 'SeaLLMs/SeaLLM-7B-v2', 'h2oai/h2ogpt-gm-experimental']
+    base_models = supports_system_prompt + other_base_models
+
+    for base_model in base_models:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained(base_model)
+
+        prompt = apply_chat_template(instruction, system_prompt, history_to_use, tokenizer, verbose=True)
+
+        if base_model in supports_system_prompt:
+            assert 'Be kind' in prompt
+        else:
+            assert 'Be kind' not in prompt
+
+        assert instruction in prompt
+        assert history_to_use[0][0] in prompt
+        assert history_to_use[0][1] in prompt

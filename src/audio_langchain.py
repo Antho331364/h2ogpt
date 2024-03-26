@@ -1,5 +1,6 @@
 import logging
 import os
+import tempfile
 import time
 import uuid
 from typing import Dict, Iterator, Optional, Tuple
@@ -25,7 +26,11 @@ class OpenAIWhisperParser(BaseBlobParser):
         import io
 
         try:
-            import openai
+            from openai import OpenAI
+            if self.api_key:
+                client = OpenAI(api_key=self.api_key)
+            else:
+                client = OpenAI()
         except ImportError:
             raise ImportError(
                 "openai package not found, please install it with "
@@ -37,10 +42,6 @@ class OpenAIWhisperParser(BaseBlobParser):
             raise ImportError(
                 "pydub package not found, please install it with " "`pip install pydub`"
             )
-
-        # Set the API key if provided
-        if self.api_key:
-            openai.api_key = self.api_key
 
         # Audio file from disk
         audio = AudioSegment.from_file(blob.path)
@@ -65,7 +66,7 @@ class OpenAIWhisperParser(BaseBlobParser):
             attempts = 0
             while attempts < 3:
                 try:
-                    transcript = openai.Audio.transcribe("whisper-1", file_obj)
+                    transcript = client.audio.transcribe("whisper-1", file_obj)
                     break
                 except Exception as e:
                     attempts += 1
@@ -110,6 +111,8 @@ class OpenAIWhisperParserLocal(BaseBlobParser):
             device_id: int = 0,
             lang_model: Optional[str] = None,
             forced_decoder_ids: Optional[Tuple[Dict]] = None,
+            use_better=True,
+            use_faster=False,
     ):
         """Initialize the parser.
 
@@ -174,14 +177,44 @@ class OpenAIWhisperParserLocal(BaseBlobParser):
         if self.device == 'cpu':
             device_map = {"", 'cpu'}
         else:
-            device_map = {"": device_id} if device_id >= 0 else {'': 'cuda'}
+            device_map = {"": 'cuda:%d' % device_id} if device_id >= 0 else {'': 'cuda'}
+
         # https://huggingface.co/blog/asr-chunking
         self.pipe = pipeline(
             "automatic-speech-recognition",
             model=self.lang_model,
             chunk_length_s=30,
+            stride_length_s=5,
+            batch_size=8,
             device_map=device_map,
         )
+        if use_better:
+            # even faster if not doing real time ASR
+            # stride_length_s=5,  batch_size=8
+            try:
+                from optimum.bettertransformer import BetterTransformer
+                self.pipe.model = BetterTransformer.transform(self.pipe.model, use_flash_attention_2=True)
+            except Exception as e:
+                print("No optimum, not using BetterTransformer: %s" % str(e), flush=True)
+
+        if use_faster and have_use_faster and self.lang_model in ['openai/whisper-large-v2',
+                                                                  'openai/whisper-large-v3']:
+            self.pipe.model.to('cpu')
+            del self.pipe.model
+            clear_torch_cache()
+            print("Using faster_whisper", flush=True)
+            # has to come here, no framework and no config for model
+            # pip install git+https://github.com/SYSTRAN/faster-whisper.git
+            from faster_whisper import WhisperModel
+            model_size = "large-v3" if self.lang_model == 'openai/whisper-large-v3' else "large-v2"
+            # Run on GPU with FP16
+            model = WhisperModel(model_size, device=self.device, compute_type="float16")
+            # or run on GPU with INT8
+            # model = WhisperModel(model_size, device="cuda", compute_type="int8_float16")
+            # or run on CPU with INT8
+            # model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            self.pipe.model = model
+
         if forced_decoder_ids is not None:
             try:
                 self.pipe.model.config.forced_decoder_ids = forced_decoder_ids
@@ -229,7 +262,14 @@ class OpenAIWhisperParserLocal(BaseBlobParser):
 
             y, sr = librosa.load(file_obj, sr=16000)
 
-        prediction = self.pipe(y.copy(), batch_size=8)["text"]
+        yc = y.copy()
+        try:
+            prediction = self.pipe(yc, batch_size=8)["text"]
+        except ValueError as e:
+            if 'Multiple languages detected' in str(e):
+                prediction = self.pipe(yc, batch_size=8, generate_kwargs={"language": "english"})["text"]
+            else:
+                raise
 
         yield Document(
             page_content=prediction,
@@ -250,9 +290,9 @@ from typing import List, Union, Any, Tuple
 
 import requests
 from langchain.docstore.document import Document
-from langchain.document_loaders import ImageCaptionLoader, YoutubeAudioLoader
+from langchain.document_loaders import ImageCaptionLoader
 
-from utils import get_device, NullContext, clear_torch_cache
+from utils import get_device, NullContext, clear_torch_cache, have_use_faster, makedirs, get_gradio_tmp
 
 from importlib.metadata import distribution, PackageNotFoundError
 
@@ -269,7 +309,10 @@ class H2OAudioCaptionLoader(ImageCaptionLoader):
     def __init__(self, path_audios: Union[str, List[str]] = None,
                  asr_model='openai/whisper-medium',
                  asr_gpu=True,
-                 gpu_id='auto'):
+                 gpu_id='auto',
+                 use_better=True,
+                 use_faster=False,
+                 ):
         super().__init__(path_audios)
         self.audio_paths = path_audios
         self.model = None
@@ -280,6 +323,9 @@ class H2OAudioCaptionLoader(ImageCaptionLoader):
         self.device = 'cpu'
         self.device_map = {"": 'cpu'}
         self.set_context()
+        self.use_better = use_better
+        self.use_faster = use_faster
+        self.files_out = []
 
     def set_context(self):
         if get_device() == 'cuda' and self.asr_gpu:
@@ -322,7 +368,10 @@ class H2OAudioCaptionLoader(ImageCaptionLoader):
                 with context_class_cast(self.device):
                     self.model = OpenAIWhisperParserLocal(device=self.device,
                                                           device_id=self.gpu_id,
-                                                          lang_model=self.asr_model)
+                                                          lang_model=self.asr_model,
+                                                          use_better=self.use_better,
+                                                          use_faster=self.use_faster,
+                                                          )
         return self
 
     def set_audio_paths(self, path_audios: Union[str, List[str]]):
@@ -340,9 +389,13 @@ class H2OAudioCaptionLoader(ImageCaptionLoader):
 
         # https://librosa.org/doc/main/generated/librosa.load.html
         if from_youtube:
-            save_dir = "/tmp/" + "_" + str(uuid.uuid4())[:10]
-            loader = GenericLoader(YoutubeAudioLoader(self.audio_paths, save_dir), self.model)
-            return loader.load()
+            save_dir = os.path.join(get_gradio_tmp(), str(uuid.uuid4()))
+            makedirs(save_dir, exist_ok=True)
+            youtube_loader = YoutubeAudioLoader(self.audio_paths, save_dir)
+            loader = GenericLoader(youtube_loader, self.model)
+            docs = loader.load()
+            self.files_out = youtube_loader.files_out
+            return docs
         else:
             docs = []
             for fil in self.audio_paths:
@@ -357,3 +410,57 @@ class H2OAudioCaptionLoader(ImageCaptionLoader):
         if hasattr(self, 'model') and hasattr(self.model, 'pipe') and hasattr(self.model.pipe.model, 'cpu'):
             self.model.pipe.model.cpu()
             clear_torch_cache()
+
+
+from typing import Iterable, List
+
+from langchain.document_loaders.blob_loaders import FileSystemBlobLoader
+from langchain.document_loaders.blob_loaders.schema import Blob, BlobLoader
+
+
+class YoutubeAudioLoader(BlobLoader):
+
+    """Load YouTube urls as audio file(s)."""
+
+    def __init__(self, urls: List[str], save_dir: str):
+        if not isinstance(urls, list):
+            raise TypeError("urls must be a list")
+
+        self.urls = urls
+        self.save_dir = save_dir
+        self.files_out = []
+
+    def yield_blobs(self) -> Iterable[Blob]:
+        """Yield audio blobs for each url."""
+
+        try:
+            import yt_dlp
+        except ImportError:
+            raise ImportError(
+                "yt_dlp package not found, please install it with "
+                "`pip install yt_dlp`"
+            )
+
+        # Use yt_dlp to download audio given a YouTube url
+        ydl_opts = {
+            "format": "m4a/bestaudio/best",
+            "noplaylist": True,
+            "outtmpl": self.save_dir + "/%(title)s.%(ext)s",
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "m4a",
+                }
+            ],
+        }
+
+        for url in self.urls:
+            # Download file
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download(url)
+
+        # Yield the written blobs
+        loader = FileSystemBlobLoader(self.save_dir, glob="*.m4a")
+        self.files_out = [os.path.join(self.save_dir, f) for f in os.listdir(self.save_dir)]
+        for blob in loader.yield_blobs():
+            yield blob

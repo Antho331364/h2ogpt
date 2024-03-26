@@ -1,16 +1,27 @@
 nameOverride: ""
 fullnameOverride: ""
+namespaceOverride: ""
 
 h2ogpt:
   enabled: true
+  stack:
+    # -- Run h2oGPT and vLLM on same pod.
+    enabled: false 
   replicaCount: 1
+  imagePullSecrets: 
   image:
     repository: gcr.io/vorvan/h2oai/h2ogpt-runtime
+    tag: 
     pullPolicy: IfNotPresent
   initImage:
     repository:
     tag:
     pullPolicy:
+  
+  podAffinity:
+  # -- Set hostname and zone to true for pod affinity rules based on hostname and zone.
+  # hostname:
+  # zone:
 
   storage:
     size: 128Gi
@@ -32,15 +43,18 @@ h2ogpt:
     replicate: 
       enabled: false
 
+# -- Example configs to use when not using Model Lock and External LLM
+  # overrideConfig:
+  #   base_model: h2oai/h2ogpt-4096-llama2-7b-chat
+  #   use_safetensors: True
+  #   prompt_type: llama2
+  #   save_dir: /workspace/save/
+  #   use_gpu_id: False
+  #   score_model: None
+  #   max_max_new_tokens: 2048
+  #   max_new_tokens: 1024
+
   overrideConfig:
-    base_model: h2oai/h2ogpt-4096-llama2-7b-chat
-    use_safetensors: True
-    prompt_type: llama2
-    save_dir: /workspace/save/
-    use_gpu_id: False
-    score_model: None
-    max_max_new_tokens: 2048
-    max_new_tokens: 1024
 
 
   service:
@@ -86,6 +100,11 @@ tgi:
     tag: 0.9.3
     pullPolicy: IfNotPresent
 
+  podAffinity:
+    # -- Set hostname and zone to true for pod affinity rules based on hostname and zone.
+    # hostname:
+    # zone:
+
   storage:
     size: 512Gi
     class: 
@@ -121,7 +140,13 @@ vllm:
 
   image:
     repository: gcr.io/vorvan/h2oai/h2ogpt-runtime
+    tag:
     pullPolicy: IfNotPresent
+
+  podAffinity:
+    # -- Set hostname and zone to true for pod affinity rules based on hostname and zone.
+    # hostname:
+    # zone:
 
   imagePullSecrets:
 
