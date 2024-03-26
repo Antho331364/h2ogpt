@@ -5180,9 +5180,13 @@ def get_chain(query=None,
 
         tools.append(searchEventsTool)
 
+        # Beds24 Tools
+
         from beds_24_api_v2_client import AuthenticatedClient
 
         client = AuthenticatedClient(base_url="https://beds24.com/api/v2/", token="SuperSecretToken")
+
+        # Smoobu Tools
 
         import smoobuwrapper
 
@@ -5274,7 +5278,8 @@ def get_chain(query=None,
 
         getPlaceholdersTool = StructuredTool.from_function(
             name="Smoobu Get Placeholders",
-            description="Useful when you need to Retrieve placeholders from Smoobu. Placeholders allow to retrieve additional informations on a specific booking",
+            description="Useful when you need to Retrieve placeholders from Smoobu. Placeholders allow to retrieve "
+                        "additional informations on a specific booking",
             func=smoobuClient.run_get_placeholders,
             args_schema=None,
             handle_tool_error=True,
@@ -5319,7 +5324,8 @@ def get_chain(query=None,
 
         getAddonsTool = StructuredTool.from_function(
             name="Smoobu Get Addons",
-            description="Useful when you need to Retrieve available addons. Addons are additional services offered by the concierge or host",
+            description="Useful when you need to Retrieve available addons. Addons are additional services offered by "
+                        "the concierge or host",
             func=smoobuClient.run_get_addons,
             args_schema=None,  # Replace with the correct schema if needed
             handle_tool_error=True,
@@ -5346,7 +5352,8 @@ def get_chain(query=None,
 
         getCustomPlaceholdersTool = StructuredTool.from_function(
             name="Smoobu Get Custom Placeholders",
-            description="Useful when you need to Retrieve custom placeholders from Smoobu. Custom Placeholders allow to retrieve additional informations on a specific booking or apartment.",
+            description="Useful when you need to Retrieve custom placeholders from Smoobu. Custom Placeholders allow "
+                        "to retrieve additional informations on a specific booking or apartment.",
             func=smoobuClient.run_get_custom_placeholders,
             args_schema=None,
             handle_tool_error=True,
@@ -5355,7 +5362,8 @@ def get_chain(query=None,
 
         getCustomPlaceholderTool = StructuredTool.from_function(
             name="Smoobu Get Custom Placeholder",
-            description="Useful when you need to Retrieve a specific custom placeholder from Smoobu. Custom Placeholder allow to retrieve additional informations on a specific booking or apartment.",
+            description="Useful when you need to Retrieve a specific custom placeholder from Smoobu. Custom "
+                        "Placeholder allow to retrieve additional informations on a specific booking or apartment.",
             func=smoobuClient.run_get_custom_placeholder,
             args_schema=None,
             handle_tool_error=True,
@@ -5398,8 +5406,204 @@ def get_chain(query=None,
         )
         tools.append(getGuestTool)
 
+        # Superhote Tools
 
+        import superhotewrapper
 
+        superhoteClient = superhotewrapper.SuperhoteAPIWrapper()
+
+        superhoteDefaultTemplate = StructuredTool.from_function(
+            name="Superhote default templates mail",
+            description="Useful when you need to retrieve message template in the user language for sending invoice, "
+                        "payment, scheduled payment, deposit. Templates include placeholders with the following"
+                        "pattern [RESSOURCE_NAME:RESSOURCE_ATTRIBUTE] for example [BOOKING:ID]. You have to replace"
+                        "placeholders with the correct values.",
+            func=superhoteClient.run_get_default_templates,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteDefaultTemplate)
+
+        superhoteGetCalendar = StructuredTool.from_function(
+            name="Superhote reservation calendar",
+            description="Useful when you need to know the booking schedule. You can filter results by rental_id, "
+                        "and date range.",
+            func=superhoteClient.run_get_calendars,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetCalendar)
+
+        superhoteGetCurrentBookings = StructuredTool.from_function(
+            name="Superhote current booking",
+            description="Useful when you need to know the current bookings for some rentals. You can filter results "
+                        "by rental_ids.",
+            func=superhoteClient.run_get_current_bookings,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetCurrentBookings)
+
+        superhoteGetRentals = StructuredTool.from_function(
+            name="Superhote get rentals details",
+            description="Useful when you need to retrieve rentals details. This may include the description of the "
+                        "accommodation, its equipment, address, capacity of the accommodation, property_key etc.,",
+            func=superhoteClient.run_get_rentals,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetRentals)
+
+        superhoteGetCustomShortCodes = StructuredTool.from_function(
+            name="Superhote get custom short codes",
+            description="Useful to retrieve Checkout procedure or Instruction Access in the user language",
+            func=superhoteClient.run_get_custom_short_codes,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetCustomShortCodes)
+
+        superhoteGetChannels = StructuredTool.from_function(
+            name="Superhote get list of channels",
+            description="Useful for retrieving the list of channels.",
+            func=superhoteClient.run_get_channels,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetChannels)
+
+        superhoteGetMessagesByBooking = StructuredTool.from_function(
+            name="Superhote get list of messages by booking",
+            description="Useful for retrieving the list of messages for a specific booking and to retrieve the Airbnb Account Token. For that you send a "
+                        "request with the booking_id argument",
+            func=superhoteClient.run_get_messages_list_by_booking_id,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetMessagesByBooking)
+
+        superhoteGetNotAvailableDatesByRental = StructuredTool.from_function(
+            name="Get the list of dates not available for a specific rental in Superhote",
+            description="Useful for retrieving the list of dates not available for a specific rental in superhote. "
+                        "For that you send a request with the rental_id argument",
+            func=superhoteClient.run_get_not_available_dates_by_rental_id,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetNotAvailableDatesByRental)
+
+        superhoteStripeAccount = StructuredTool.from_function(
+            name="Get stripe account details",
+            description="Useful for retrieving Stripe account details like the stripe_account_id attribute.",
+            func=superhoteClient.run_create_payments,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteStripeAccount)
+
+        superhoteCreatePayment = StructuredTool.from_function(
+            name="Create a payment in Superhote",
+            description="Useful when you need to create a payment in Superhote. For example, a guest requests a late "
+                        "checkout or an early checkin. For that you send a request with the following arguments:"
+                        "booking_id, customer_email(guest mail), title(eg: Late checkout), stripe_account_id",
+            func=superhoteClient.run_create_payments,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteCreatePayment)
+
+        superhoteAirbnbListing = StructuredTool.from_function(
+            name="Get airbnb listing details for a specific rental in Superhote",
+            description="Useful when you need to retrieve additional details of a specific accommodation",
+            func=superhoteClient.run_get_airbnb_listing,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteAirbnbListing)
+
+        superhoteGetAvailabilities = StructuredTool.from_function(
+            name="Get availabilities in Superhote",
+            description="Useful when you need to check if the accommodation is available based on guest/traveler"
+                        "needs. You can filter the request by start_date and end_date, nbr_adults, nbr_children. The "
+                        "function requires the Superhote API Key and property_key arguments of the rental to check.",
+            func=superhoteClient.run_get_availabilities,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetAvailabilities)
+
+        superhoteGetAccount = StructuredTool.from_function(
+            name="Get account details in Superhote",
+            description="Useful when you need to get the API Key for some Superhote API endpoints.",
+            func=superhoteClient.run_get_account,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetAccount)
+
+        superhotePostMessage = StructuredTool.from_function(
+            name="Send message in Superhote",
+            description="Useful when you need to send a message in SuperHote, reply to a guest message. The function"
+                        "requires as argument the message to send, the booking_id, the guest_id and the "
+                        "Airbnb account token.",
+            func=superhoteClient.run_post_message,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhotePostMessage)
+
+        superhoteSendInvoice = StructuredTool.from_function(
+            name="Send Invoice by Superhote",
+            description="Useful when you need to send an invoice to the guest by SuperHote. The function "
+                        "requires as argument the message to send, the booking_id, the guest's email, the language of "
+                        "the email sent, subject of the mail",
+            func=superhoteClient.run_send_invoice,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteSendInvoice)
+
+        superhoteSendPayment = StructuredTool.from_function(
+            name="Send Invoice by Superhote",
+            description="Useful when you need to send a payment to the traveler by SuperHote after creating a"
+                        "payment. The function requires as argument the message to send, the rental_id, "
+                        "the payment_id of the payment created, the language of the email sent, subject of the mail",
+            func=superhoteClient.run_send_payment,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteSendPayment)
+
+        superhoteGetBooking = StructuredTool.from_function(
+            name="Get Booking by Superhote",
+            description="Useful when you need to retrieve details of a specific booking. The function "
+                        "requires as argument the booking_id",
+            func=superhoteClient.run_get_booking,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetBooking)
+
+        superhoteGetBookingByDate = StructuredTool.from_function(
+            name="Get Booking by Superhote",
+            description="Useful when you need to check if there are bookings on a specific date. The function"
+                        "requires as an argument the date on which to search and optionnaly a rental_id to filter on "
+                        "a specific accomodation.",
+            func=superhoteClient.run_get_booking_by_date,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetBookingByDate)
+
+        superhoteGetRental = StructuredTool.from_function(
+            name="Get rental by Superhote",
+            description="Useful when you need to retrieve details of a specific rental. The function "
+                        "requires as argument the rental_id",
+            func=superhoteClient.run_get_rental,
+            handle_tool_error=True,
+        )
+
+        tools.append(superhoteGetRental)
 
         from langchain.docstore import InMemoryDocstore
         from langchain.embeddings import OpenAIEmbeddings

@@ -18,7 +18,7 @@ from superhote_client.api.default import (post_api_v2_user_login, get_api_v2_get
                                           post_api_v2_get_availabilities, post_api_v2_bookings, post_api_v2_messages,
                                           post_api_v2_payments_send_payment, post_api_v2_send_invoice,
                                           get_api_v2_bookings_booking_id, get_api_v2_bookings_get_by_selected_day_date,
-                                          get_api_v2_rentals_rental_id
+                                          get_api_v2_rentals_rental_id, get_api_v2_stripe_accounts, get_api_v2_account
                                           )
 from superhote_client.models import (
     UserLoginBody, V2GetnotavailabledatesBody, GetApiV2PaymentsFilterByStatus,
@@ -171,6 +171,12 @@ class SuperhoteAPIWrapper(BaseModel):
 
     def run_get_airbnb_listing(self, rental_id: int):
         return get_api_v2_get_airbnb_listings.sync(client=self.client_authenticated, rental_id=rental_id)
+
+    def run_get_stripe_account(self):
+        return get_api_v2_stripe_accounts.sync(client=self.client_authenticated)
+
+    def run_get_account(self):
+        return get_api_v2_account.sync(client=self.client_authenticated)
 
     def run_get_availabilities(self, api_key: str, property_key: str, start_date: date, end_date: date, nbr_adults: int,
                                nbr_children: int, include_taxes: bool = False):
